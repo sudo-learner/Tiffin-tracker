@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tiffin Tracker</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#c2410c">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tiffin">
+<style>
+:root{
+  --bg:#f6f4f0; --card:#ffffff; --text:#1f2320; --muted:#6b7280; --accent:#c2410c; --accent2:#16a34a; --border:#e5e2dc; --danger:#dc2626; --chip:#f1efe9;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#15171a; --card:#1f2226; --text:#eceae6; --muted:#9aa0a6; --accent:#fb923c; --accent2:#4ade80; --border:#2b2f34; --chip:#26292e; }
+}
+:root[data-theme="dark"]{ --bg:#15171a; --card:#1f2226; --text:#eceae6; --muted:#9aa0a6; --accent:#fb923c; --accent2:#4ade80; --border:#2b2f34; --chip:#26292e; }
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  padding:16px;padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));}
+.wrap{max-width:480px;margin:0 auto;}
+h1{font-size:1.3rem;margin:0 0 4px;}
+.sub{color:var(--muted);font-size:.85rem;margin-bottom:16px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px;}
+.progress-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+.progress-row b{font-size:1.4rem;}
+.bar{height:10px;border-radius:6px;background:var(--chip);overflow:hidden;}
+.bar>div{height:100%;background:var(--accent);transition:width .3s;}
+.meta{color:var(--muted);font-size:.8rem;margin-top:8px;}
+label{display:block;font-size:.8rem;color:var(--muted);margin:10px 0 4px;}
+input[type=date],input[type=text]{width:100%;padding:9px 10px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.95rem;}
+.seg{display:flex;gap:8px;margin-top:4px;}
+.seg button{flex:1;padding:9px;border-radius:9px;border:1px solid var(--border);background:var(--chip);color:var(--text);font-size:.85rem;cursor:pointer;}
+.seg button.active-yes{background:var(--accent2);color:#06210f;border-color:var(--accent2);}
+.seg button.active-no{background:var(--danger);color:#fff;border-color:var(--danger);}
+.savebtn{width:100%;margin-top:14px;padding:11px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:.95rem;font-weight:600;cursor:pointer;}
+.entry{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:.88rem;}
+.entry:last-child{border-bottom:none;}
+.entry .d{color:var(--muted);width:80px;}
+.tag{padding:2px 8px;border-radius:20px;font-size:.72rem;font-weight:600;}
+.tag.yes{background:var(--accent2);color:#06210f;}
+.tag.no{background:var(--danger);color:#fff;}
+.entry .tags{display:flex;gap:6px;}
+.del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.8rem;padding:0 0 0 8px;}
+.hist-item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:.85rem;}
+.hist-item:last-child{border-bottom:none;}
+.hidden{display:none;}
+h2{font-size:.95rem;margin:0 0 10px;}
+.setup h1{margin-top:6px;}
+.install{width:100%;margin-bottom:14px;padding:10px;border-radius:10px;border:1px solid var(--accent);background:var(--card);color:var(--accent);font-size:.9rem;font-weight:600;cursor:pointer;}
+.hint{color:var(--muted);font-size:.8rem;margin-bottom:14px;}
+@media (min-width:900px){ .wrap{max-width:720px;} }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div class="wrap">
+  <button class="install hidden" id="installBtn">📲 Install app on this device</button>
+  <div class="hint hidden" id="iosHint">To install: tap the Share button, then "Add to Home Screen".</div>
+  <div id="login" class="hidden">
+    <h1>🍱 Tiffin Tracker</h1>
+    <div class="card">
+      <h2>Sign in to save your data online</h2>
+      <label>Your email</label>
+      <input type="text" id="emailInput" placeholder="you@example.com">
+      <button class="savebtn" id="loginBtn">Send login link</button>
+      <div id="codeBox" class="hidden">
+        <label>Or type the code from the email</label>
+        <input type="text" id="codeInput" inputmode="numeric" placeholder="Code">
+        <button class="savebtn" id="codeBtn">Verify code</button>
+      </div>
+      <div class="meta" id="loginMsg"></div>
+    </div>
+  </div>
+  <div id="setup" class="setup hidden">
+    <h1>🍱 Tiffin Tracker</h1>
+    <p class="sub">Track your 60-meal tiffin cycle (lunch + dinner).</p>
+    <div class="card">
+      <h2>When did your current tiffin cycle start?</h2>
+      <label>Cycle start date</label>
+      <input type="date" id="startDateInput">
+      <button class="savebtn" id="startBtn">Start Tracking</button>
+    </div>
+  </div>
+
+  <div id="main" class="hidden">
+    <h1>🍱 Tiffin Tracker</h1>
+    <p class="sub" id="cycleSub"></p>
+
+    <div class="card">
+      <div class="progress-row"><span>Meals used</span><b id="countText">0/60</b></div>
+      <div class="bar"><div id="bar" style="width:0%"></div></div>
+      <div class="meta" id="meta"></div>
+    </div>
+
+    <div class="card">
+      <h2>Add / update a day</h2>
+      <label>Date</label>
+      <input type="date" id="entryDate">
+      <label>Lunch</label>
+      <div class="seg">
+        <button type="button" id="lunchYes">Taken</button>
+        <button type="button" id="lunchNo">Not given</button>
+      </div>
+      <input type="text" id="lunchNote" placeholder="Reason (optional)" class="hidden" style="margin-top:8px;">
+      <label>Dinner</label>
+      <div class="seg">
+        <button type="button" id="dinnerYes">Taken</button>
+        <button type="button" id="dinnerNo">Not given</button>
+      </div>
+      <input type="text" id="dinnerNote" placeholder="Reason (optional)" class="hidden" style="margin-top:8px;">
+      <button class="savebtn" id="saveBtn">Save Day</button>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h2 style="margin:0;">This cycle — entries</h2>
+        <button id="exportBtn" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--chip);color:var(--text);font-size:.8rem;cursor:pointer;">📊 Export Excel</button>
+      </div>
+      <div id="entryList" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="card" id="historyCard">
+      <h2>Past cycles</h2>
+      <div id="historyList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const KEY = 'tiffin-tracker-data';
+// Paste your Supabase values here. If they are empty, the app uses localStorage only.
+const SUPABASE_URL = "https://gzaxzbszidireoekzgkk.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6YXh6YnN6aWRpcmVvZWt6Z2trIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxNzk5ODgsImV4cCI6MjEwNTc1NTk4OH0.7S95-JhTo2BaxegqwdO11tWdK2bRpmbXI_2DaZIDJWc";
+const useCloud = !!(SUPABASE_URL && SUPABASE_KEY);
+let sb, uid;
+const HOME = location.origin + location.pathname.replace(/index\.html$/, '');
+const urlErr = new URLSearchParams(location.hash.slice(1)).get('error_description') || new URLSearchParams(location.search).get('error_description');
+if(useCloud){
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType:'implicit', detectSessionInUrl:true, persistSession:true, autoRefreshToken:true } });
+  sb.auth.onAuthStateChange((ev)=>{ if(ev==='SIGNED_IN' && !uid) load(); });
+}
+let data = null;
+let lunchVal = null, dinnerVal = null;
+
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function mealCount(cycle){ return cycle.entries.reduce((s,e)=>s+(e.lunch?1:0)+(e.dinner?1:0),0); }
+function dayName(d){ return new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'long'}); }
+function fmt(d){ return new Date(d+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+
+async function load(){
+  if(useCloud){
+    const sess = (await sb.auth.getSession()).data.session;
+    if(!sess){
+      document.getElementById('login').classList.remove('hidden');
+      if(urlErr) document.getElementById('loginMsg').textContent = 'Login link problem: ' + urlErr + '. Please send a new link.';
+      return;
+    }
+    document.getElementById('login').classList.add('hidden');
+    uid = sess.user.id;
+    try{
+      const res = await sb.from('tiffin_data').select('data').eq('user_id', uid).maybeSingle();
+      if(res.error) throw res.error;
+      data = res.data ? res.data.data : null;
+    }catch(e){ console.error('load failed', e); data = null; }
+  }
+  if(!data){
+    try{
+      const raw = localStorage.getItem(KEY);
+      data = raw ? JSON.parse(raw) : null;
+      if(data && useCloud) await save(); // move old browser data to the cloud once
+    }catch(e){ data = null; }
+  }
+  if(!data || !data.cycles || !data.cycles.length){
+    document.getElementById('setup').classList.remove('hidden');
+    document.getElementById('startDateInput').value = todayStr();
+  } else {
+    document.getElementById('main').classList.remove('hidden');
+    document.getElementById('entryDate').value = todayStr();
+    render();
+  }
+}
+
+async function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){ console.error('save failed', e); }
+  if(useCloud && uid){
+    const res = await sb.from('tiffin_data').upsert({ user_id: uid, data: data, updated_at: new Date().toISOString() });
+    if(res.error){ console.error('cloud save failed', res.error); alert('Could not save online. Check your internet.'); }
+  }
+}
+document.getElementById('loginBtn').onclick = async ()=>{
+  const email = document.getElementById('emailInput').value.trim();
+  if(!email){ alert('Enter your email'); return; }
+  const res = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: HOME } });
+  document.getElementById('loginMsg').textContent = res.error ? 'Error: ' + res.error.message : 'Check your email. Click the link, or type the code below.';
+  if(!res.error) document.getElementById('codeBox').classList.remove('hidden');
+};
+
+document.getElementById('codeBtn').onclick = async ()=>{
+  const email = document.getElementById('emailInput').value.trim();
+  const token = document.getElementById('codeInput').value.trim();
+  if(!email || !token){ alert('Enter your email and the code'); return; }
+  const res = await sb.auth.verifyOtp({ email, token, type:'email' });
+  if(res.error){ document.getElementById('loginMsg').textContent = 'Error: ' + res.error.message; return; }
+  load();
+};
+
+document.getElementById('startBtn').onclick = async ()=>{
+  const start = document.getElementById('startDateInput').value || todayStr();
+  data = { cycles: [{ startDate: start, entries: [] }] };
+  await save();
+  document.getElementById('setup').classList.add('hidden');
+  document.getElementById('main').classList.remove('hidden');
+  document.getElementById('entryDate').value = todayStr();
+  render();
+};
+
+function setSeg(which, val){
+  if(which==='lunch'){ lunchVal = val; }
+  else { dinnerVal = val; }
+  ['lunchYes','lunchNo','dinnerYes','dinnerNo'].forEach(id=>{
+    document.getElementById(id).classList.remove('active-yes','active-no');
+  });
+  if(lunchVal===true) document.getElementById('lunchYes').classList.add('active-yes');
+  if(lunchVal===false) document.getElementById('lunchNo').classList.add('active-no');
+  if(dinnerVal===true) document.getElementById('dinnerYes').classList.add('active-yes');
+  if(dinnerVal===false) document.getElementById('dinnerNo').classList.add('active-no');
+  document.getElementById('lunchNote').classList.toggle('hidden', lunchVal!==false);
+  document.getElementById('dinnerNote').classList.toggle('hidden', dinnerVal!==false);
+}
+document.getElementById('lunchYes').onclick=()=>setSeg('lunch',true);
+document.getElementById('lunchNo').onclick=()=>setSeg('lunch',false);
+document.getElementById('dinnerYes').onclick=()=>setSeg('dinner',true);
+document.getElementById('dinnerNo').onclick=()=>setSeg('dinner',false);
+
+document.getElementById('saveBtn').onclick = async ()=>{
+  const date = document.getElementById('entryDate').value;
+  if(!date){ alert('Pick a date'); return; }
+  if(lunchVal===null || dinnerVal===null){ alert('Set both lunch and dinner status'); return; }
+  const lunchNote = document.getElementById('lunchNote').value.trim();
+  const dinnerNote = document.getElementById('dinnerNote').value.trim();
+
+  let cycle = data.cycles[data.cycles.length-1];
+  if(mealCount(cycle) >= 60){
+    cycle = { startDate: date, entries: [] };
+    data.cycles.push(cycle);
+  }
+  const entry = { date, lunch: lunchVal, dinner: dinnerVal, lunchNote: lunchVal? '': lunchNote, dinnerNote: dinnerVal? '': dinnerNote };
+  const idx = cycle.entries.findIndex(e=>e.date===date);
+  if(idx>=0) cycle.entries[idx]=entry; else cycle.entries.push(entry);
+  cycle.entries.sort((a,b)=>a.date.localeCompare(b.date));
+
+  await save();
+  lunchVal=null; dinnerVal=null; setSeg('lunch',null);
+  document.getElementById('lunchNote').value=''; document.getElementById('dinnerNote').value='';
+  render();
+};
+
+async function deleteEntry(date){
+  const cycle = data.cycles[data.cycles.length-1];
+  cycle.entries = cycle.entries.filter(e=>e.date!==date);
+  await save();
+  render();
+}
+
+function render(){
+  const cycle = data.cycles[data.cycles.length-1];
+  const count = mealCount(cycle);
+  document.getElementById('cycleSub').textContent = `Cycle started ${fmt(cycle.startDate)} · ${cycle.entries.length} day(s) recorded`;
+  document.getElementById('countText').textContent = `${count}/60`;
+  document.getElementById('bar').style.width = Math.min(100,(count/60*100)) + '%';
+  document.getElementById('meta').textContent = count>=60
+    ? 'Cycle complete — your next saved day starts a new cycle automatically.'
+    : `${60-count} meals remaining in this cycle.`;
+
+  const list = document.getElementById('entryList');
+  list.innerHTML = '';
+  if(!cycle.entries.length){
+    list.innerHTML = '<div class="meta">No days recorded yet.</div>';
+  } else {
+    [...cycle.entries].reverse().forEach(e=>{
+      const row = document.createElement('div');
+      row.className = 'entry';
+      row.innerHTML = `<span class="d">${fmt(e.date)}</span>
+        <span class="tags">
+          <span class="tag ${e.lunch?'yes':'no'}" title="${e.lunch?'':(e.lunchNote||'')}">L</span>
+          <span class="tag ${e.dinner?'yes':'no'}" title="${e.dinner?'':(e.dinnerNote||'')}">D</span>
+        </span>
+        <button class="del" data-date="${e.date}">✕</button>`;
+      row.querySelector('.del').onclick = ()=>deleteEntry(e.date);
+      list.appendChild(row);
+    });
+  }
+
+  const hist = document.getElementById('historyList');
+  const past = data.cycles.slice(0,-1);
+  if(!past.length){
+    document.getElementById('historyCard').classList.add('hidden');
+  } else {
+    document.getElementById('historyCard').classList.remove('hidden');
+    hist.innerHTML = past.map((c,i)=>{
+      const cnt = mealCount(c);
+      const end = c.entries.length ? c.entries[c.entries.length-1].date : c.startDate;
+      return `<div class="hist-item"><span>Cycle ${i+1}: ${fmt(c.startDate)} → ${fmt(end)}</span><span>${cnt}/60</span></div>`;
+    }).join('');
+  }
+}
+
+document.getElementById('exportBtn').onclick = async ()=>{
+  const cycle = data.cycles[data.cycles.length-1];
+  if(!cycle.entries.length){ alert('No entries to export yet.'); return; }
+  let running = 0;
+  const rows = [['Date','Day','Day No.','Reason','Number of Days (meals used so far)']];
+  cycle.entries.forEach((e,i)=>{
+    running += (e.lunch?1:0) + (e.dinner?1:0);
+    const reasons = [];
+    if(!e.lunch) reasons.push('Lunch: ' + (e.lunchNote || 'not given'));
+    if(!e.dinner) reasons.push('Dinner: ' + (e.dinnerNote || 'not given'));
+    rows.push([fmt(e.date), dayName(e.date), i+1, reasons.join('; '), running]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:14},{wch:12},{wch:8},{wch:32},{wch:14}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Tiffin Cycle');
+  const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+  const blob = new Blob([wbout], {type:'application/octet-stream'});
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `tiffin-cycle-${cycle.startDate}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+
+// ---- Install app (PWA) ----
+let installEvt = null;
+const installBtn = document.getElementById('installBtn');
+window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installEvt = e; installBtn.classList.remove('hidden'); });
+installBtn.onclick = async ()=>{
+  if(!installEvt) return;
+  installEvt.prompt();
+  await installEvt.userChoice;
+  installEvt = null; installBtn.classList.add('hidden');
+};
+window.addEventListener('appinstalled', ()=>installBtn.classList.add('hidden'));
+const isStandalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+if(/iphone|ipad|ipod/i.test(navigator.userAgent) && !isStandalone) document.getElementById('iosHint').classList.remove('hidden');
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+load();
+</script>
+</body>
+</html>
