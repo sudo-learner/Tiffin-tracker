@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Tiffin Tracker</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#c2410c">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tiffin">
 <style>
 :root{
   --bg:#f6f4f0; --card:#ffffff; --text:#1f2320; --muted:#6b7280; --accent:#c2410c; --accent2:#16a34a; --border:#e5e2dc; --danger:#dc2626; --chip:#f1efe9;
@@ -45,12 +52,17 @@ input[type=date],input[type=text]{width:100%;padding:9px 10px;border-radius:9px;
 .hidden{display:none;}
 h2{font-size:.95rem;margin:0 0 10px;}
 .setup h1{margin-top:6px;}
+.install{width:100%;margin-bottom:14px;padding:10px;border-radius:10px;border:1px solid var(--accent);background:var(--card);color:var(--accent);font-size:.9rem;font-weight:600;cursor:pointer;}
+.hint{color:var(--muted);font-size:.8rem;margin-bottom:14px;}
+@media (min-width:900px){ .wrap{max-width:720px;} }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div class="wrap">
+  <button class="install hidden" id="installBtn">📲 Install app on this device</button>
+  <div class="hint hidden" id="iosHint">To install: tap the Share button, then "Add to Home Screen".</div>
   <div id="login" class="hidden">
     <h1>🍱 Tiffin Tracker</h1>
     <div class="card">
@@ -58,6 +70,11 @@ h2{font-size:.95rem;margin:0 0 10px;}
       <label>Your email</label>
       <input type="text" id="emailInput" placeholder="you@example.com">
       <button class="savebtn" id="loginBtn">Send login link</button>
+      <div id="codeBox" class="hidden">
+        <label>Or type the code from the email</label>
+        <input type="text" id="codeInput" inputmode="numeric" placeholder="Code">
+        <button class="savebtn" id="codeBtn">Verify code</button>
+      </div>
       <div class="meta" id="loginMsg"></div>
     </div>
   </div>
@@ -123,7 +140,12 @@ const SUPABASE_URL = "https://gzaxzbszidireoekzgkk.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6YXh6YnN6aWRpcmVvZWt6Z2trIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxNzk5ODgsImV4cCI6MjEwNTc1NTk4OH0.7S95-JhTo2BaxegqwdO11tWdK2bRpmbXI_2DaZIDJWc";
 const useCloud = !!(SUPABASE_URL && SUPABASE_KEY);
 let sb, uid;
-if(useCloud){ sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); }
+const HOME = location.origin + location.pathname.replace(/index\.html$/, '');
+const urlErr = new URLSearchParams(location.hash.slice(1)).get('error_description') || new URLSearchParams(location.search).get('error_description');
+if(useCloud){
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType:'implicit', detectSessionInUrl:true, persistSession:true, autoRefreshToken:true } });
+  sb.auth.onAuthStateChange((ev)=>{ if(ev==='SIGNED_IN' && !uid) load(); });
+}
 let data = null;
 let lunchVal = null, dinnerVal = null;
 
@@ -135,7 +157,11 @@ function fmt(d){ return new Date(d+'T00:00:00').toLocaleDateString('en-IN',{day:
 async function load(){
   if(useCloud){
     const sess = (await sb.auth.getSession()).data.session;
-    if(!sess){ document.getElementById('login').classList.remove('hidden'); return; }
+    if(!sess){
+      document.getElementById('login').classList.remove('hidden');
+      if(urlErr) document.getElementById('loginMsg').textContent = 'Login link problem: ' + urlErr + '. Please send a new link.';
+      return;
+    }
     document.getElementById('login').classList.add('hidden');
     uid = sess.user.id;
     try{
@@ -171,8 +197,18 @@ async function save(){
 document.getElementById('loginBtn').onclick = async ()=>{
   const email = document.getElementById('emailInput').value.trim();
   if(!email){ alert('Enter your email'); return; }
-  const res = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.origin + location.pathname } });
-  document.getElementById('loginMsg').textContent = res.error ? 'Error: ' + res.error.message : 'Check your email and click the login link.';
+  const res = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: HOME } });
+  document.getElementById('loginMsg').textContent = res.error ? 'Error: ' + res.error.message : 'Check your email. Click the link, or type the code below.';
+  if(!res.error) document.getElementById('codeBox').classList.remove('hidden');
+};
+
+document.getElementById('codeBtn').onclick = async ()=>{
+  const email = document.getElementById('emailInput').value.trim();
+  const token = document.getElementById('codeInput').value.trim();
+  if(!email || !token){ alert('Enter your email and the code'); return; }
+  const res = await sb.auth.verifyOtp({ email, token, type:'email' });
+  if(res.error){ document.getElementById('loginMsg').textContent = 'Error: ' + res.error.message; return; }
+  load();
 };
 
 document.getElementById('startBtn').onclick = async ()=>{
@@ -304,6 +340,21 @@ document.getElementById('exportBtn').onclick = async ()=>{
   a.remove();
   URL.revokeObjectURL(url);
 };
+
+// ---- Install app (PWA) ----
+let installEvt = null;
+const installBtn = document.getElementById('installBtn');
+window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installEvt = e; installBtn.classList.remove('hidden'); });
+installBtn.onclick = async ()=>{
+  if(!installEvt) return;
+  installEvt.prompt();
+  await installEvt.userChoice;
+  installEvt = null; installBtn.classList.add('hidden');
+};
+window.addEventListener('appinstalled', ()=>installBtn.classList.add('hidden'));
+const isStandalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+if(/iphone|ipad|ipod/i.test(navigator.userAgent) && !isStandalone) document.getElementById('iosHint').classList.remove('hidden');
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 
 load();
 </script>
