@@ -33,7 +33,7 @@ h1{font-size:1.3rem;margin:0 0 4px;}
 .bar>div{height:100%;background:var(--accent);transition:width .3s;}
 .meta{color:var(--muted);font-size:.8rem;margin-top:8px;}
 label{display:block;font-size:.8rem;color:var(--muted);margin:10px 0 4px;}
-input[type=date],input[type=text]{width:100%;padding:9px 10px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.95rem;}
+input[type=date],input[type=text],input[type=password]{width:100%;padding:9px 10px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.95rem;}
 .seg{display:flex;gap:8px;margin-top:4px;}
 .seg button{flex:1;padding:9px;border-radius:9px;border:1px solid var(--border);background:var(--chip);color:var(--text);font-size:.85rem;cursor:pointer;}
 .seg button.active-yes{background:var(--accent2);color:#06210f;border-color:var(--accent2);}
@@ -53,6 +53,8 @@ input[type=date],input[type=text]{width:100%;padding:9px 10px;border-radius:9px;
 h2{font-size:.95rem;margin:0 0 10px;}
 .setup h1{margin-top:6px;}
 .install{width:100%;margin-bottom:14px;padding:10px;border-radius:10px;border:1px solid var(--accent);background:var(--card);color:var(--accent);font-size:.9rem;font-weight:600;cursor:pointer;}
+.dl{padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--chip);color:var(--text);font-size:.75rem;cursor:pointer;margin-left:8px;}
+.savebtn.sec{background:var(--chip);color:var(--text);border:1px solid var(--border);}
 .hint{color:var(--muted);font-size:.8rem;margin-bottom:14px;}
 @media (min-width:900px){ .wrap{max-width:720px;} }
 </style>
@@ -69,7 +71,12 @@ h2{font-size:.95rem;margin:0 0 10px;}
       <h2>Sign in to save your data online</h2>
       <label>Your email</label>
       <input type="text" id="emailInput" placeholder="you@example.com">
-      <button class="savebtn" id="loginBtn">Send login link</button>
+      <label>Password</label>
+      <input type="password" id="passInput" placeholder="Your password">
+      <button class="savebtn" id="passBtn">Log in</button>
+      <button class="savebtn sec" id="signupBtn">Create account</button>
+      <label>No password? Use an email link or code instead:</label>
+      <button class="savebtn sec" id="loginBtn" style="margin-top:4px;">Email me a login link</button>
       <div id="codeBox" class="hidden">
         <label>Or type the code from the email</label>
         <input type="text" id="codeInput" inputmode="numeric" placeholder="Code">
@@ -130,6 +137,15 @@ h2{font-size:.95rem;margin:0 0 10px;}
       <h2>Past cycles</h2>
       <div id="historyList"></div>
     </div>
+
+    <div class="card hidden" id="accountCard">
+      <h2>Account</h2>
+      <label>Set or change password</label>
+      <input type="password" id="newPass" placeholder="New password (at least 6 characters)">
+      <button class="savebtn" id="setPassBtn">Save password</button>
+      <button class="savebtn sec" id="logoutBtn">Log out</button>
+      <div class="meta" id="accMsg"></div>
+    </div>
   </div>
 </div>
 
@@ -164,6 +180,7 @@ async function load(){
     }
     document.getElementById('login').classList.add('hidden');
     uid = sess.user.id;
+    document.getElementById('accountCard').classList.remove('hidden');
     try{
       const res = await sb.from('tiffin_data').select('data').eq('user_id', uid).maybeSingle();
       if(res.error) throw res.error;
@@ -202,6 +219,36 @@ document.getElementById('loginBtn').onclick = async ()=>{
   if(!res.error) document.getElementById('codeBox').classList.remove('hidden');
 };
 
+document.getElementById('passBtn').onclick = async ()=>{
+  const email = document.getElementById('emailInput').value.trim();
+  const password = document.getElementById('passInput').value;
+  if(!email || !password){ alert('Enter your email and password'); return; }
+  const res = await sb.auth.signInWithPassword({ email, password });
+  if(res.error){ document.getElementById('loginMsg').textContent = 'Error: ' + res.error.message; return; }
+  load();
+};
+document.getElementById('signupBtn').onclick = async ()=>{
+  const email = document.getElementById('emailInput').value.trim();
+  const password = document.getElementById('passInput').value;
+  if(!email || password.length < 6){ alert('Enter your email and a password of at least 6 characters'); return; }
+  const res = await sb.auth.signUp({ email, password, options:{ emailRedirectTo: HOME } });
+  if(res.error){ document.getElementById('loginMsg').textContent = 'Error: ' + res.error.message; return; }
+  if(res.data.session){ load(); }
+  else document.getElementById('loginMsg').textContent = 'Account created. Please confirm the email we sent, then log in.';
+};
+document.getElementById('setPassBtn').onclick = async ()=>{
+  const pw = document.getElementById('newPass').value;
+  const msg = document.getElementById('accMsg');
+  if(pw.length < 6){ msg.textContent = 'Use at least 6 characters.'; return; }
+  const res = await sb.auth.updateUser({ password: pw });
+  msg.textContent = res.error ? 'Error: ' + res.error.message : 'Password saved. You can now log in with it.';
+  if(!res.error) document.getElementById('newPass').value = '';
+};
+document.getElementById('logoutBtn').onclick = async ()=>{
+  await sb.auth.signOut();
+  try{ localStorage.removeItem(KEY); }catch(e){}
+  location.reload();
+};
 document.getElementById('codeBtn').onclick = async ()=>{
   const email = document.getElementById('emailInput').value.trim();
   const token = document.getElementById('codeInput').value.trim();
@@ -307,13 +354,13 @@ function render(){
     hist.innerHTML = past.map((c,i)=>{
       const cnt = mealCount(c);
       const end = c.entries.length ? c.entries[c.entries.length-1].date : c.startDate;
-      return `<div class="hist-item"><span>Cycle ${i+1}: ${fmt(c.startDate)} → ${fmt(end)}</span><span>${cnt}/60</span></div>`;
+      return `<div class="hist-item"><span>Cycle ${i+1}: ${fmt(c.startDate)} → ${fmt(end)}</span><span>${cnt}/60 <button class="dl" data-i="${i}">📊 Excel</button></span></div>`;
     }).join('');
+    hist.querySelectorAll('.dl').forEach(b=>{ b.onclick = ()=>exportCycle(past[b.dataset.i]); });
   }
 }
 
-document.getElementById('exportBtn').onclick = async ()=>{
-  const cycle = data.cycles[data.cycles.length-1];
+async function exportCycle(cycle){
   if(!cycle.entries.length){ alert('No entries to export yet.'); return; }
   let running = 0;
   const rows = [['Date','Day','Day No.','Reason','Number of Days (meals used so far)']];
@@ -339,7 +386,8 @@ document.getElementById('exportBtn').onclick = async ()=>{
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
-};
+}
+document.getElementById('exportBtn').onclick = ()=>exportCycle(data.cycles[data.cycles.length-1]);
 
 // ---- Install app (PWA) ----
 let installEvt = null;
