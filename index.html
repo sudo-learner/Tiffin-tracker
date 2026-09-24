@@ -55,6 +55,7 @@ h2{font-size:.95rem;margin:0 0 10px;}
 .install{width:100%;margin-bottom:14px;padding:10px;border-radius:10px;border:1px solid var(--accent);background:var(--card);color:var(--accent);font-size:.9rem;font-weight:600;cursor:pointer;}
 .dl{padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--chip);color:var(--text);font-size:.75rem;cursor:pointer;margin-left:8px;}
 .savebtn.sec{background:var(--chip);color:var(--text);border:1px solid var(--border);}
+.logout{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--chip);color:var(--text);font-size:.8rem;cursor:pointer;}
 .hint{color:var(--muted);font-size:.8rem;margin-bottom:14px;}
 @media (min-width:900px){ .wrap{max-width:720px;} }
 </style>
@@ -75,6 +76,10 @@ h2{font-size:.95rem;margin:0 0 10px;}
       <input type="password" id="passInput" placeholder="Your password">
       <button class="savebtn" id="passBtn">Log in</button>
       <button class="savebtn sec" id="signupBtn">Create account</button>
+      <label>Change password: fill email and current password above, type the new password here, then click the button.</label>
+      <input type="password" id="newPass" placeholder="New password (at least 6 characters)">
+      <button class="savebtn sec" id="setPassBtn">Change password</button>
+      <button class="savebtn sec" id="forgotBtn">Forgot password? Email me a reset link</button>
       <label>No password? Use an email link or code instead:</label>
       <button class="savebtn sec" id="loginBtn" style="margin-top:4px;">Email me a login link</button>
       <div id="codeBox" class="hidden">
@@ -97,7 +102,10 @@ h2{font-size:.95rem;margin:0 0 10px;}
   </div>
 
   <div id="main" class="hidden">
-    <h1>🍱 Tiffin Tracker</h1>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <h1>🍱 Tiffin Tracker</h1>
+      <button class="logout hidden" id="logoutBtn">Log out</button>
+    </div>
     <p class="sub" id="cycleSub"></p>
 
     <div class="card">
@@ -137,15 +145,6 @@ h2{font-size:.95rem;margin:0 0 10px;}
       <h2>Past cycles</h2>
       <div id="historyList"></div>
     </div>
-
-    <div class="card hidden" id="accountCard">
-      <h2>Account</h2>
-      <label>Set or change password</label>
-      <input type="password" id="newPass" placeholder="New password (at least 6 characters)">
-      <button class="savebtn" id="setPassBtn">Save password</button>
-      <button class="savebtn sec" id="logoutBtn">Log out</button>
-      <div class="meta" id="accMsg"></div>
-    </div>
   </div>
 </div>
 
@@ -160,7 +159,13 @@ const HOME = location.origin + location.pathname.replace(/index\.html$/, '');
 const urlErr = new URLSearchParams(location.hash.slice(1)).get('error_description') || new URLSearchParams(location.search).get('error_description');
 if(useCloud){
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType:'implicit', detectSessionInUrl:true, persistSession:true, autoRefreshToken:true } });
-  sb.auth.onAuthStateChange((ev)=>{ if(ev==='SIGNED_IN' && !uid) load(); });
+  sb.auth.onAuthStateChange(async (ev)=>{
+    if(ev==='PASSWORD_RECOVERY'){
+      const pw = prompt('Type your new password (at least 6 characters)');
+      if(pw && pw.length >= 6){ const r = await sb.auth.updateUser({ password: pw }); alert(r.error ? 'Error: ' + r.error.message : 'Password changed.'); }
+    }
+    if(ev==='SIGNED_IN' && !uid) load();
+  });
 }
 let data = null;
 let lunchVal = null, dinnerVal = null;
@@ -180,7 +185,7 @@ async function load(){
     }
     document.getElementById('login').classList.add('hidden');
     uid = sess.user.id;
-    document.getElementById('accountCard').classList.remove('hidden');
+    document.getElementById('logoutBtn').classList.remove('hidden');
     try{
       const res = await sb.from('tiffin_data').select('data').eq('user_id', uid).maybeSingle();
       if(res.error) throw res.error;
@@ -237,12 +242,23 @@ document.getElementById('signupBtn').onclick = async ()=>{
   else document.getElementById('loginMsg').textContent = 'Account created. Please confirm the email we sent, then log in.';
 };
 document.getElementById('setPassBtn').onclick = async ()=>{
+  const email = document.getElementById('emailInput').value.trim();
+  const password = document.getElementById('passInput').value;
   const pw = document.getElementById('newPass').value;
-  const msg = document.getElementById('accMsg');
-  if(pw.length < 6){ msg.textContent = 'Use at least 6 characters.'; return; }
+  const msg = document.getElementById('loginMsg');
+  if(!email || !password){ msg.textContent = 'Enter your email and current password above first.'; return; }
+  if(pw.length < 6){ msg.textContent = 'New password must have at least 6 characters.'; return; }
+  const a = await sb.auth.signInWithPassword({ email, password });
+  if(a.error){ msg.textContent = 'Error: ' + a.error.message; return; }
   const res = await sb.auth.updateUser({ password: pw });
-  msg.textContent = res.error ? 'Error: ' + res.error.message : 'Password saved. You can now log in with it.';
-  if(!res.error) document.getElementById('newPass').value = '';
+  if(res.error){ msg.textContent = 'Error: ' + res.error.message; return; }
+  alert('Password changed. Use the new password next time.');
+};
+document.getElementById('forgotBtn').onclick = async ()=>{
+  const email = document.getElementById('emailInput').value.trim();
+  if(!email){ alert('Enter your email first'); return; }
+  const res = await sb.auth.resetPasswordForEmail(email, { redirectTo: HOME });
+  document.getElementById('loginMsg').textContent = res.error ? 'Error: ' + res.error.message : 'Reset link sent. Open it, then type your new password.';
 };
 document.getElementById('logoutBtn').onclick = async ()=>{
   await sb.auth.signOut();
@@ -363,16 +379,16 @@ function render(){
 async function exportCycle(cycle){
   if(!cycle.entries.length){ alert('No entries to export yet.'); return; }
   let running = 0;
-  const rows = [['Date','Day','Day No.','Reason','Number of Days (meals used so far)']];
+  const rows = [['Date','Day','Reason','Number of Days (meals used so far)']];
   cycle.entries.forEach((e,i)=>{
     running += (e.lunch?1:0) + (e.dinner?1:0);
     const reasons = [];
     if(!e.lunch) reasons.push('Lunch: ' + (e.lunchNote || 'not given'));
     if(!e.dinner) reasons.push('Dinner: ' + (e.dinnerNote || 'not given'));
-    rows.push([fmt(e.date), dayName(e.date), i+1, reasons.join('; '), running]);
+    rows.push([fmt(e.date), dayName(e.date), reasons.join('; '), running]);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{wch:14},{wch:12},{wch:8},{wch:32},{wch:14}];
+  ws['!cols'] = [{wch:14},{wch:12},{wch:32},{wch:14}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Tiffin Cycle');
   const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
