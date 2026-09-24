@@ -56,6 +56,14 @@ h2{font-size:.95rem;margin:0 0 10px;}
 .dl{padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--chip);color:var(--text);font-size:.75rem;cursor:pointer;margin-left:8px;}
 .savebtn.sec{background:var(--chip);color:var(--text);border:1px solid var(--border);}
 .logout{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--chip);color:var(--text);font-size:.8rem;cursor:pointer;}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px));z-index:10;}
+.modal.hidden{display:none;}
+.sheet{background:var(--card);border:1px solid var(--border);border-radius:14px;width:100%;max-width:720px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;}
+.sheetbar{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);gap:8px;}
+.sheetscroll{overflow:auto;}
+#sheetTable{border-collapse:collapse;width:100%;font-size:.82rem;}
+#sheetTable th,#sheetTable td{border:1px solid var(--border);padding:6px 8px;text-align:left;white-space:nowrap;}
+#sheetTable th{background:var(--chip);position:sticky;top:0;}
 .hint{color:var(--muted);font-size:.8rem;margin-bottom:14px;}
 @media (min-width:900px){ .wrap{max-width:720px;} }
 </style>
@@ -136,7 +144,7 @@ h2{font-size:.95rem;margin:0 0 10px;}
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <h2 style="margin:0;">This cycle — entries</h2>
-        <button id="exportBtn" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--chip);color:var(--text);font-size:.8rem;cursor:pointer;">📊 Export Excel</button>
+        <button id="exportBtn" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--chip);color:var(--text);font-size:.8rem;cursor:pointer;">📊 Excel</button>
       </div>
       <div id="entryList" style="margin-top:10px;"></div>
     </div>
@@ -145,6 +153,16 @@ h2{font-size:.95rem;margin:0 0 10px;}
       <h2>Past cycles</h2>
       <div id="historyList"></div>
     </div>
+  </div>
+</div>
+
+<div id="sheetModal" class="modal hidden">
+  <div class="sheet">
+    <div class="sheetbar">
+      <b id="sheetTitle">Excel sheet</b>
+      <span><button class="dl" id="sheetDownload">⬇ Download Excel</button><button class="dl" id="sheetClose">✕</button></span>
+    </div>
+    <div class="sheetscroll"><table id="sheetTable"></table></div>
   </div>
 </div>
 
@@ -372,12 +390,11 @@ function render(){
       const end = c.entries.length ? c.entries[c.entries.length-1].date : c.startDate;
       return `<div class="hist-item"><span>Cycle ${i+1}: ${fmt(c.startDate)} → ${fmt(end)}</span><span>${cnt}/60 <button class="dl" data-i="${i}">📊 Excel</button></span></div>`;
     }).join('');
-    hist.querySelectorAll('.dl').forEach(b=>{ b.onclick = ()=>exportCycle(past[b.dataset.i]); });
+    hist.querySelectorAll('.dl').forEach(b=>{ b.onclick = ()=>showSheet(past[b.dataset.i]); });
   }
 }
 
-async function exportCycle(cycle){
-  if(!cycle.entries.length){ alert('No entries to export yet.'); return; }
+function buildRows(cycle){
   let running = 0;
   const rows = [['Date','Day','Reason','Number of Days (meals used so far)']];
   cycle.entries.forEach((e,i)=>{
@@ -387,6 +404,11 @@ async function exportCycle(cycle){
     if(!e.dinner) reasons.push('Dinner: ' + (e.dinnerNote || 'not given'));
     rows.push([fmt(e.date), dayName(e.date), reasons.join('; '), running]);
   });
+  return rows;
+}
+async function exportCycle(cycle){
+  if(!cycle.entries.length){ alert('No entries to export yet.'); return; }
+  const rows = buildRows(cycle);
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!cols'] = [{wch:14},{wch:12},{wch:32},{wch:14}];
   const wb = XLSX.utils.book_new();
@@ -403,7 +425,20 @@ async function exportCycle(cycle){
   a.remove();
   URL.revokeObjectURL(url);
 }
-document.getElementById('exportBtn').onclick = ()=>exportCycle(data.cycles[data.cycles.length-1]);
+let sheetCycle = null;
+function esc(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function showSheet(cycle){
+  if(!cycle.entries.length){ alert('No entries to show yet.'); return; }
+  sheetCycle = cycle;
+  document.getElementById('sheetTitle').textContent = 'Cycle from ' + fmt(cycle.startDate);
+  document.getElementById('sheetTable').innerHTML = buildRows(cycle).map((r,i)=>
+    '<tr>' + r.map(c=> (i ? '<td>' : '<th>') + esc(c) + (i ? '</td>' : '</th>')).join('') + '</tr>').join('');
+  document.getElementById('sheetModal').classList.remove('hidden');
+}
+document.getElementById('sheetDownload').onclick = ()=>exportCycle(sheetCycle);
+document.getElementById('sheetClose').onclick = ()=>document.getElementById('sheetModal').classList.add('hidden');
+document.getElementById('sheetModal').onclick = e=>{ if(e.target.id==='sheetModal') e.target.classList.add('hidden'); };
+document.getElementById('exportBtn').onclick = ()=>showSheet(data.cycles[data.cycles.length-1]);
 
 // ---- Install app (PWA) ----
 let installEvt = null;
