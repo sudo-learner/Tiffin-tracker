@@ -32,3 +32,6 @@ Just double-click `index.html` — it opens in your browser, no server needed.
 
 ## Note on data
 By default data is saved in `localStorage`. To save it online (free) with Supabase, paste `SUPABASE_URL` and `SUPABASE_KEY` inside `index.html`. Then the app asks for your email (magic link) and syncs your data across phone and laptop.
+
+## Install as an app
+Open the live site in Chrome/Edge (Android or laptop) and click **Install app on this device**. On iPhone: Share → Add to Home Screen. In the installed app, log in with the email code (not the link), because the app and the browser keep separate storage.

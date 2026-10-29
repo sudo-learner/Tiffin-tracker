@@ -13,12 +13,12 @@
 <meta name="apple-mobile-web-app-title" content="Tiffin">
 <style>
 :root{
-  --bg:#f6f4f0; --card:#ffffff; --text:#1f2320; --muted:#6b7280; --accent:#c2410c; --accent2:#16a34a; --border:#e5e2dc; --danger:#dc2626; --chip:#f1efe9;
+  --bg:#f6f4f0; --card:#ffffff; --text:#1f2320; --muted:#6b7280; --accent:#c2410c; --accent2:#16a34a; --border:#e5e2dc; --danger:#dc2626; --chip:#f1efe9; --water:#0ea5e9;
 }
 @media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){ --bg:#15171a; --card:#1f2226; --text:#eceae6; --muted:#9aa0a6; --accent:#fb923c; --accent2:#4ade80; --border:#2b2f34; --chip:#26292e; }
+  :root:not([data-theme="light"]){ --bg:#15171a; --card:#1f2226; --text:#eceae6; --muted:#9aa0a6; --accent:#fb923c; --accent2:#4ade80; --border:#2b2f34; --chip:#26292e; --water:#38bdf8; }
 }
-:root[data-theme="dark"]{ --bg:#15171a; --card:#1f2226; --text:#eceae6; --muted:#9aa0a6; --accent:#fb923c; --accent2:#4ade80; --border:#2b2f34; --chip:#26292e; }
+:root[data-theme="dark"]{ --bg:#15171a; --card:#1f2226; --text:#eceae6; --muted:#9aa0a6; --accent:#fb923c; --accent2:#4ade80; --border:#2b2f34; --chip:#26292e; --water:#38bdf8; }
 html{scroll-padding-top:env(safe-area-inset-top,0px);}
 *{box-sizing:border-box;}
 body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
@@ -31,17 +31,19 @@ h1{font-size:1.3rem;margin:0 0 4px;}
 .progress-row b{font-size:1.4rem;}
 .bar{height:10px;border-radius:6px;background:var(--chip);overflow:hidden;}
 .bar>div{height:100%;background:var(--accent);transition:width .3s;}
+.bar>div.water{background:var(--water);}
 .meta{color:var(--muted);font-size:.8rem;margin-top:8px;}
 label{display:block;font-size:.8rem;color:var(--muted);margin:10px 0 4px;}
-input[type=date],input[type=text],input[type=password]{width:100%;padding:9px 10px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.95rem;}
+input[type=date],input[type=text],input[type=password],input[type=number]{width:100%;padding:9px 10px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.95rem;}
 .seg{display:flex;gap:8px;margin-top:4px;}
 .seg button{flex:1;padding:9px;border-radius:9px;border:1px solid var(--border);background:var(--chip);color:var(--text);font-size:.85rem;cursor:pointer;}
 .seg button.active-yes{background:var(--accent2);color:#06210f;border-color:var(--accent2);}
 .seg button.active-no{background:var(--danger);color:#fff;border-color:var(--danger);}
 .savebtn{width:100%;margin-top:14px;padding:11px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:.95rem;font-weight:600;cursor:pointer;}
+.savebtn.water{background:var(--water);}
 .entry{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:.88rem;}
 .entry:last-child{border-bottom:none;}
-.entry .d{color:var(--muted);width:80px;}
+.entry .d{color:var(--muted);width:120px;}
 .tag{padding:2px 8px;border-radius:20px;font-size:.72rem;font-weight:600;}
 .tag.yes{background:var(--accent2);color:#06210f;}
 .tag.no{background:var(--danger);color:#fff;}
@@ -65,6 +67,9 @@ h2{font-size:.95rem;margin:0 0 10px;}
 #sheetTable th,#sheetTable td{border:1px solid var(--border);padding:6px 8px;text-align:left;white-space:nowrap;}
 #sheetTable th{background:var(--chip);position:sticky;top:0;}
 .hint{color:var(--muted);font-size:.8rem;margin-bottom:14px;}
+.tabbar{display:flex;gap:6px;background:var(--chip);border-radius:12px;padding:4px;margin:14px 0;}
+.tabbtn{flex:1;padding:9px 4px;border:none;border-radius:9px;background:transparent;color:var(--muted);font-size:.85rem;font-weight:600;cursor:pointer;}
+.tabbtn.active{background:var(--card);color:var(--text);}
 @media (min-width:900px){ .wrap{max-width:720px;} }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -75,7 +80,7 @@ h2{font-size:.95rem;margin:0 0 10px;}
   <button class="install hidden" id="installBtn">📲 Install app on this device</button>
   <div class="hint hidden" id="iosHint">To install: tap the Share button, then "Add to Home Screen".</div>
   <div id="login" class="hidden">
-    <h1>🍱 Tiffin Tracker</h1>
+    <h1>🍱 Tiffin &amp; Water Tracker</h1>
     <div class="card">
       <h2>Sign in to save your data online</h2>
       <label>Your email</label>
@@ -98,60 +103,134 @@ h2{font-size:.95rem;margin:0 0 10px;}
       <div class="meta" id="loginMsg"></div>
     </div>
   </div>
-  <div id="setup" class="setup hidden">
-    <h1>🍱 Tiffin Tracker</h1>
-    <p class="sub">Track your 60-meal tiffin cycle (lunch + dinner).</p>
-    <div class="card">
-      <h2>When did your current tiffin cycle start?</h2>
-      <label>Cycle start date</label>
-      <input type="date" id="startDateInput">
-      <button class="savebtn" id="startBtn">Start Tracking</button>
-    </div>
-  </div>
 
   <div id="main" class="hidden">
     <div style="display:flex;justify-content:space-between;align-items:center;">
-      <h1>🍱 Tiffin Tracker</h1>
+      <h1 id="appTitle">🍱 Tiffin Tracker</h1>
       <button class="logout hidden" id="logoutBtn">Log out</button>
     </div>
-    <p class="sub" id="cycleSub"></p>
 
-    <div class="card">
-      <div class="progress-row"><span>Meals used</span><b id="countText">0/60</b></div>
-      <div class="bar"><div id="bar" style="width:0%"></div></div>
-      <div class="meta" id="meta"></div>
+    <div class="tabbar">
+      <button class="tabbtn active" id="tabBtnTiffin" data-tab="tiffin">🍱 Tiffin</button>
+      <button class="tabbtn" id="tabBtnWater" data-tab="water">💧 Water</button>
+      <button class="tabbtn" id="tabBtnAccount" data-tab="account">👤 Account</button>
     </div>
 
-    <div class="card">
-      <h2>Add / update a day</h2>
-      <label>Date</label>
-      <input type="date" id="entryDate">
-      <label>Lunch</label>
-      <div class="seg">
-        <button type="button" id="lunchYes">Taken</button>
-        <button type="button" id="lunchNo">Not given</button>
+    <!-- TIFFIN TAB -->
+    <div id="tabTiffin">
+      <div id="tiffinSetup" class="setup hidden">
+        <p class="sub">Track your 60-meal tiffin cycle (lunch + dinner).</p>
+        <div class="card">
+          <h2>When did your current tiffin cycle start?</h2>
+          <label>Cycle start date</label>
+          <input type="date" id="startDateInput">
+          <button class="savebtn" id="startBtn">Start Tracking</button>
+        </div>
       </div>
-      <input type="text" id="lunchNote" placeholder="Reason (optional)" class="hidden" style="margin-top:8px;">
-      <label>Dinner</label>
-      <div class="seg">
-        <button type="button" id="dinnerYes">Taken</button>
-        <button type="button" id="dinnerNo">Not given</button>
+
+      <div id="tiffinApp" class="hidden">
+        <p class="sub" id="cycleSub"></p>
+        <div class="card">
+          <div class="progress-row"><span>Meals used</span><b id="countText">0/60</b></div>
+          <div class="bar"><div id="bar" style="width:0%"></div></div>
+          <div class="meta" id="meta"></div>
+        </div>
+
+        <div class="card">
+          <h2>Add / update a day</h2>
+          <label>Date</label>
+          <input type="date" id="entryDate">
+          <label>Lunch</label>
+          <div class="seg">
+            <button type="button" id="lunchYes">Taken</button>
+            <button type="button" id="lunchNo">Not given</button>
+          </div>
+          <input type="text" id="lunchNote" placeholder="Reason (optional)" class="hidden" style="margin-top:8px;">
+          <label>Dinner</label>
+          <div class="seg">
+            <button type="button" id="dinnerYes">Taken</button>
+            <button type="button" id="dinnerNo">Not given</button>
+          </div>
+          <input type="text" id="dinnerNote" placeholder="Reason (optional)" class="hidden" style="margin-top:8px;">
+          <button class="savebtn" id="saveBtn">Save Day</button>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <h2 style="margin:0;">This cycle — entries</h2>
+            <button id="exportBtn" class="dl">📊 Excel</button>
+          </div>
+          <div id="entryList" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="card" id="historyCard">
+          <h2>Past cycles</h2>
+          <div id="historyList"></div>
+        </div>
       </div>
-      <input type="text" id="dinnerNote" placeholder="Reason (optional)" class="hidden" style="margin-top:8px;">
-      <button class="savebtn" id="saveBtn">Save Day</button>
     </div>
 
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <h2 style="margin:0;">This cycle — entries</h2>
-        <button id="exportBtn" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--chip);color:var(--text);font-size:.8rem;cursor:pointer;">📊 Excel</button>
+    <!-- WATER TAB -->
+    <div id="tabWater" class="hidden">
+      <div id="waterSetup" class="setup hidden">
+        <p class="sub">Track your water camper/jar delivery cycle.</p>
+        <div class="card">
+          <h2>Set up your water cycle</h2>
+          <label>How many days is your water cycle? (e.g. 10)</label>
+          <input type="number" id="waterCycleSizeInput" min="1" value="10">
+          <label>When did (or does) your first water cycle start?</label>
+          <input type="date" id="waterStartDateInput">
+          <button class="savebtn water" id="waterStartBtn">Start Water Tracking</button>
+        </div>
       </div>
-      <div id="entryList" style="margin-top:10px;"></div>
+
+      <div id="waterApp" class="hidden">
+        <p class="sub" id="waterCycleSub"></p>
+        <div class="card">
+          <div class="progress-row"><span>Water received</span><b id="waterCountText">0/10</b></div>
+          <div class="bar"><div id="waterBar" class="water" style="width:0%"></div></div>
+          <div class="meta" id="waterMeta"></div>
+        </div>
+
+        <div class="card">
+          <h2>Add a delivery</h2>
+          <label>Date water was received</label>
+          <input type="date" id="waterEntryDate">
+          <button class="savebtn water" id="waterSaveBtn">Mark Received</button>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <h2 style="margin:0;">This cycle — deliveries</h2>
+            <button id="waterExportBtn" class="dl">📊 Excel</button>
+          </div>
+          <div id="waterEntryList" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="card" id="waterHistoryCard">
+          <h2>Past water cycles</h2>
+          <div id="waterHistoryList"></div>
+        </div>
+      </div>
     </div>
 
-    <div class="card" id="historyCard">
-      <h2>Past cycles</h2>
-      <div id="historyList"></div>
+    <!-- ACCOUNT TAB -->
+    <div id="tabAccount" class="hidden">
+      <div class="card">
+        <h2>Your account</h2>
+        <div class="meta" id="accountEmail"></div>
+      </div>
+      <div class="card" id="dashCard">
+        <h2>Dashboard</h2>
+        <div id="dashBody"></div>
+      </div>
+      <div class="card">
+        <label>New password</label>
+        <input type="password" id="accNewPass" placeholder="At least 6 characters">
+        <button class="savebtn sec" id="accSetPassBtn">Update password</button>
+        <div class="meta" id="accMsg"></div>
+        <button class="savebtn" id="accLogoutBtn" style="margin-top:18px;">Log out</button>
+      </div>
     </div>
   </div>
 </div>
@@ -172,7 +251,7 @@ const KEY = 'tiffin-tracker-data';
 const SUPABASE_URL = "https://gzaxzbszidireoekzgkk.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6YXh6YnN6aWRpcmVvZWt6Z2trIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxNzk5ODgsImV4cCI6MjEwNTc1NTk4OH0.7S95-JhTo2BaxegqwdO11tWdK2bRpmbXI_2DaZIDJWc";
 const useCloud = !!(SUPABASE_URL && SUPABASE_KEY);
-let sb, uid;
+let sb, uid, userEmail;
 const HOME = location.origin + location.pathname.replace(/index\.html$/, '');
 const urlErr = new URLSearchParams(location.hash.slice(1)).get('error_description') || new URLSearchParams(location.search).get('error_description');
 if(useCloud){
@@ -189,9 +268,25 @@ let data = null;
 let lunchVal = null, dinnerVal = null;
 
 function todayStr(){ return new Date().toISOString().slice(0,10); }
+const MAX_PAST_CYCLES = 2;
+function trimCycles(arr){
+  // keep at most MAX_PAST_CYCLES completed cycles plus the current (last) one
+  let trimmed = false;
+  while(arr.length > MAX_PAST_CYCLES + 1){ arr.shift(); trimmed = true; }
+  return trimmed;
+}
 function mealCount(cycle){ return cycle.entries.reduce((s,e)=>s+(e.lunch?1:0)+(e.dinner?1:0),0); }
 function dayName(d){ return new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'long'}); }
 function fmt(d){ return new Date(d+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+
+// ---- Tabs ----
+document.querySelectorAll('.tabbtn').forEach(b=>{
+  b.onclick = ()=>{
+    document.querySelectorAll('.tabbtn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    ['tiffin','water','account'].forEach(t=> document.getElementById('tab'+t[0].toUpperCase()+t.slice(1)).classList.toggle('hidden', t!==b.dataset.tab));
+  };
+});
 
 async function load(){
   if(useCloud){
@@ -203,7 +298,9 @@ async function load(){
     }
     document.getElementById('login').classList.add('hidden');
     uid = sess.user.id;
+    userEmail = sess.user.email;
     document.getElementById('logoutBtn').classList.remove('hidden');
+    document.getElementById('accountEmail').textContent = 'Signed in as ' + userEmail;
     try{
       const res = await sb.from('tiffin_data').select('data').eq('user_id', uid).maybeSingle();
       if(res.error) throw res.error;
@@ -217,14 +314,15 @@ async function load(){
       if(data && useCloud) await save(); // move old browser data to the cloud once
     }catch(e){ data = null; }
   }
-  if(!data || !data.cycles || !data.cycles.length){
-    document.getElementById('setup').classList.remove('hidden');
-    document.getElementById('startDateInput').value = todayStr();
-  } else {
-    document.getElementById('main').classList.remove('hidden');
-    document.getElementById('entryDate').value = todayStr();
-    render();
-  }
+  let needsSave = false;
+  if(data && data.cycles && trimCycles(data.cycles)) needsSave = true;
+  if(data && data.water && data.water.cycles && trimCycles(data.water.cycles)) needsSave = true;
+  if(needsSave) await save();
+
+  document.getElementById('main').classList.remove('hidden');
+  renderTiffinTab();
+  renderWaterTab();
+  renderDashboard();
 }
 
 async function save(){
@@ -278,10 +376,20 @@ document.getElementById('forgotBtn').onclick = async ()=>{
   const res = await sb.auth.resetPasswordForEmail(email, { redirectTo: HOME });
   document.getElementById('loginMsg').textContent = res.error ? 'Error: ' + res.error.message : 'Reset link sent. Open it, then type your new password.';
 };
-document.getElementById('logoutBtn').onclick = async ()=>{
+async function doLogout(){
   await sb.auth.signOut();
   try{ localStorage.removeItem(KEY); }catch(e){}
   location.reload();
+}
+document.getElementById('logoutBtn').onclick = doLogout;
+document.getElementById('accLogoutBtn').onclick = doLogout;
+document.getElementById('accSetPassBtn').onclick = async ()=>{
+  const pw = document.getElementById('accNewPass').value;
+  const msg = document.getElementById('accMsg');
+  if(pw.length < 6){ msg.textContent = 'Use at least 6 characters.'; return; }
+  const res = await sb.auth.updateUser({ password: pw });
+  msg.textContent = res.error ? 'Error: ' + res.error.message : 'Password updated.';
+  if(!res.error) document.getElementById('accNewPass').value = '';
 };
 document.getElementById('codeBtn').onclick = async ()=>{
   const email = document.getElementById('emailInput').value.trim();
@@ -292,14 +400,26 @@ document.getElementById('codeBtn').onclick = async ()=>{
   load();
 };
 
+// ============ TIFFIN ============
+function renderTiffinTab(){
+  if(!data || !data.cycles || !data.cycles.length){
+    document.getElementById('tiffinSetup').classList.remove('hidden');
+    document.getElementById('tiffinApp').classList.add('hidden');
+    document.getElementById('startDateInput').value = todayStr();
+  } else {
+    document.getElementById('tiffinSetup').classList.add('hidden');
+    document.getElementById('tiffinApp').classList.remove('hidden');
+    document.getElementById('entryDate').value = todayStr();
+    render();
+  }
+}
 document.getElementById('startBtn').onclick = async ()=>{
   const start = document.getElementById('startDateInput').value || todayStr();
-  data = { cycles: [{ startDate: start, entries: [] }] };
+  if(!data) data = { cycles: [] };
+  data.cycles = [{ startDate: start, entries: [] }];
   await save();
-  document.getElementById('setup').classList.add('hidden');
-  document.getElementById('main').classList.remove('hidden');
-  document.getElementById('entryDate').value = todayStr();
-  render();
+  renderTiffinTab();
+  renderDashboard();
 };
 
 function setSeg(which, val){
@@ -331,6 +451,7 @@ document.getElementById('saveBtn').onclick = async ()=>{
   if(mealCount(cycle) >= 60){
     cycle = { startDate: date, entries: [] };
     data.cycles.push(cycle);
+    trimCycles(data.cycles);
   }
   const entry = { date, lunch: lunchVal, dinner: dinnerVal, lunchNote: lunchVal? '': lunchNote, dinnerNote: dinnerVal? '': dinnerNote };
   const idx = cycle.entries.findIndex(e=>e.date===date);
@@ -341,6 +462,7 @@ document.getElementById('saveBtn').onclick = async ()=>{
   lunchVal=null; dinnerVal=null; setSeg('lunch',null);
   document.getElementById('lunchNote').value=''; document.getElementById('dinnerNote').value='';
   render();
+  renderDashboard();
 };
 
 async function deleteEntry(date){
@@ -390,7 +512,7 @@ function render(){
       const end = c.entries.length ? c.entries[c.entries.length-1].date : c.startDate;
       return `<div class="hist-item"><span>Cycle ${i+1}: ${fmt(c.startDate)} → ${fmt(end)}</span><span>${cnt}/60 <button class="dl" data-i="${i}">📊 Excel</button></span></div>`;
     }).join('');
-    hist.querySelectorAll('.dl').forEach(b=>{ b.onclick = ()=>showSheet(past[b.dataset.i]); });
+    hist.querySelectorAll('.dl').forEach(b=>{ b.onclick = ()=>showSheet('tiffin', past[b.dataset.i]); });
   }
 }
 
@@ -406,7 +528,7 @@ function buildRows(cycle){
   });
   return rows;
 }
-async function exportCycle(cycle){
+function exportCycle(cycle){
   if(!cycle.entries.length){ alert('No entries to export yet.'); return; }
   const rows = buildRows(cycle);
   const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -415,7 +537,6 @@ async function exportCycle(cycle){
   XLSX.utils.book_append_sheet(wb, ws, 'Tiffin Cycle');
   const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
   const blob = new Blob([wbout], {type:'application/octet-stream'});
-
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -425,20 +546,169 @@ async function exportCycle(cycle){
   a.remove();
   URL.revokeObjectURL(url);
 }
-let sheetCycle = null;
+document.getElementById('exportBtn').onclick = ()=>showSheet('tiffin', data.cycles[data.cycles.length-1]);
+
+// ============ WATER ============
+function waterCount(cycle){ return cycle.entries.length; }
+function renderWaterTab(){
+  if(!data || !data.water || !data.water.cycles || !data.water.cycles.length){
+    document.getElementById('waterSetup').classList.remove('hidden');
+    document.getElementById('waterApp').classList.add('hidden');
+    document.getElementById('waterStartDateInput').value = todayStr();
+  } else {
+    document.getElementById('waterSetup').classList.add('hidden');
+    document.getElementById('waterApp').classList.remove('hidden');
+    document.getElementById('waterEntryDate').value = todayStr();
+    renderWater();
+  }
+}
+document.getElementById('waterStartBtn').onclick = async ()=>{
+  const size = Math.max(1, parseInt(document.getElementById('waterCycleSizeInput').value) || 10);
+  const start = document.getElementById('waterStartDateInput').value || todayStr();
+  if(!data) data = { cycles: [] };
+  data.water = { cycleSize: size, cycles: [{ startDate: start, size, entries: [] }] };
+  await save();
+  renderWaterTab();
+  renderDashboard();
+};
+
+document.getElementById('waterSaveBtn').onclick = async ()=>{
+  const date = document.getElementById('waterEntryDate').value;
+  if(!date){ alert('Pick a date'); return; }
+  let cycle = data.water.cycles[data.water.cycles.length-1];
+  if(waterCount(cycle) >= cycle.size){
+    cycle = { startDate: date, size: data.water.cycleSize, entries: [] };
+    data.water.cycles.push(cycle);
+    trimCycles(data.water.cycles);
+  }
+  if(!cycle.entries.find(e=>e.date===date)){
+    cycle.entries.push({ date });
+    cycle.entries.sort((a,b)=>a.date.localeCompare(b.date));
+  }
+  await save();
+  renderWater();
+  renderDashboard();
+};
+
+async function deleteWaterEntry(date){
+  const cycle = data.water.cycles[data.water.cycles.length-1];
+  cycle.entries = cycle.entries.filter(e=>e.date!==date);
+  await save();
+  renderWater();
+}
+
+function renderWater(){
+  const cycle = data.water.cycles[data.water.cycles.length-1];
+  const count = waterCount(cycle);
+  document.getElementById('waterCycleSub').textContent = `Cycle started ${fmt(cycle.startDate)} · cycle size ${cycle.size}`;
+  document.getElementById('waterCountText').textContent = `${count}/${cycle.size}`;
+  document.getElementById('waterBar').style.width = Math.min(100,(count/cycle.size*100)) + '%';
+  document.getElementById('waterMeta').textContent = count>=cycle.size
+    ? 'Cycle complete — your next saved delivery starts a new cycle automatically.'
+    : `${cycle.size-count} deliveries remaining in this cycle.`;
+
+  const list = document.getElementById('waterEntryList');
+  list.innerHTML = '';
+  if(!cycle.entries.length){
+    list.innerHTML = '<div class="meta">No deliveries recorded yet.</div>';
+  } else {
+    [...cycle.entries].reverse().forEach(e=>{
+      const row = document.createElement('div');
+      row.className = 'entry';
+      row.innerHTML = `<span class="d">${fmt(e.date)} · ${dayName(e.date)}</span>
+        <button class="del" data-date="${e.date}">✕</button>`;
+      row.querySelector('.del').onclick = ()=>deleteWaterEntry(e.date);
+      list.appendChild(row);
+    });
+  }
+
+  const hist = document.getElementById('waterHistoryList');
+  const past = data.water.cycles.slice(0,-1);
+  if(!past.length){
+    document.getElementById('waterHistoryCard').classList.add('hidden');
+  } else {
+    document.getElementById('waterHistoryCard').classList.remove('hidden');
+    hist.innerHTML = past.map((c,i)=>{
+      const cnt = waterCount(c);
+      const end = c.entries.length ? c.entries[c.entries.length-1].date : c.startDate;
+      return `<div class="hist-item"><span>Cycle ${i+1}: ${fmt(c.startDate)} → ${fmt(end)}</span><span>${cnt}/${c.size} <button class="dl" data-i="${i}">📊 Excel</button></span></div>`;
+    }).join('');
+    hist.querySelectorAll('.dl').forEach(b=>{ b.onclick = ()=>showSheet('water', past[b.dataset.i]); });
+  }
+}
+
+function buildWaterRows(cycle){
+  const rows = [['Date','Day','Number of Deliveries (this cycle)']];
+  cycle.entries.forEach((e,i)=>{
+    rows.push([fmt(e.date), dayName(e.date), i+1]);
+  });
+  return rows;
+}
+function exportWaterCycle(cycle){
+  if(!cycle.entries.length){ alert('No deliveries to export yet.'); return; }
+  const rows = buildWaterRows(cycle);
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:14},{wch:12},{wch:20}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Water Cycle');
+  const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+  const blob = new Blob([wbout], {type:'application/octet-stream'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `water-cycle-${cycle.startDate}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+document.getElementById('waterExportBtn').onclick = ()=>showSheet('water', data.water.cycles[data.water.cycles.length-1]);
+
+// ============ SHARED: Excel sheet viewer modal ============
+let sheetKind = null, sheetCycle = null;
 function esc(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
-function showSheet(cycle){
-  if(!cycle.entries.length){ alert('No entries to show yet.'); return; }
-  sheetCycle = cycle;
-  document.getElementById('sheetTitle').textContent = 'Cycle from ' + fmt(cycle.startDate);
-  document.getElementById('sheetTable').innerHTML = buildRows(cycle).map((r,i)=>
+function showSheet(kind, cycle){
+  const rows = kind==='water' ? buildWaterRows(cycle) : buildRows(cycle);
+  if(cycle.entries.length===0){ alert('No entries to show yet.'); return; }
+  sheetKind = kind; sheetCycle = cycle;
+  document.getElementById('sheetTitle').textContent = (kind==='water' ? '💧 Water cycle from ' : '🍱 Tiffin cycle from ') + fmt(cycle.startDate);
+  document.getElementById('sheetTable').innerHTML = rows.map((r,i)=>
     '<tr>' + r.map(c=> (i ? '<td>' : '<th>') + esc(c) + (i ? '</td>' : '</th>')).join('') + '</tr>').join('');
   document.getElementById('sheetModal').classList.remove('hidden');
 }
-document.getElementById('sheetDownload').onclick = ()=>exportCycle(sheetCycle);
+document.getElementById('sheetDownload').onclick = ()=>{
+  if(sheetKind==='water') exportWaterCycle(sheetCycle); else exportCycle(sheetCycle);
+};
 document.getElementById('sheetClose').onclick = ()=>document.getElementById('sheetModal').classList.add('hidden');
 document.getElementById('sheetModal').onclick = e=>{ if(e.target.id==='sheetModal') e.target.classList.add('hidden'); };
-document.getElementById('exportBtn').onclick = ()=>showSheet(data.cycles[data.cycles.length-1]);
+
+// ============ ACCOUNT DASHBOARD ============
+function renderDashboard(){
+  const box = document.getElementById('dashBody');
+  let html = '';
+
+  if(data && data.cycles && data.cycles.length){
+    const c = data.cycles[data.cycles.length-1];
+    const used = mealCount(c);
+    html += `<div class="hist-item"><span>🍱 Tiffin — current cycle (since ${fmt(c.startDate)})</span><span>${used}/60</span></div>`;
+    const pastT = data.cycles.length - 1;
+    if(pastT>0) html += `<div class="hist-item"><span>🍱 Past tiffin cycles saved</span><span>${pastT}</span></div>`;
+  } else {
+    html += `<div class="hist-item"><span>🍱 Tiffin</span><span>Not started yet</span></div>`;
+  }
+
+  if(data && data.water && data.water.cycles && data.water.cycles.length){
+    const c = data.water.cycles[data.water.cycles.length-1];
+    const used = waterCount(c);
+    html += `<div class="hist-item"><span>💧 Water — current cycle (since ${fmt(c.startDate)})</span><span>${used}/${c.size}</span></div>`;
+    const pastW = data.water.cycles.length - 1;
+    if(pastW>0) html += `<div class="hist-item"><span>💧 Past water cycles saved</span><span>${pastW}</span></div>`;
+  } else {
+    html += `<div class="hist-item"><span>💧 Water</span><span>Not started yet</span></div>`;
+  }
+
+  box.innerHTML = html;
+}
 
 // ---- Install app (PWA) ----
 let installEvt = null;
